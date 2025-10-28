@@ -21,7 +21,8 @@ A sophisticated AI system powered by Groq's Llama 3.3 70B that can autonomously 
 
 ### 1. Clone and Setup
 ```bash
-cd /Users/franksimpson/CascadeProjects/strands-swarm-team
+git clone https://github.com/klogins-hash/strands-agent-swarm-team.git
+cd strands-agent-swarm-team
 cp .env.example .env
 
 # Edit .env and add your Groq API key
