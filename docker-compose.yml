@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+
+  # Redis for session management and caching
+  redis:
+    image: redis:7-alpine
+    container_name: strands-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    environment:
+      - REDIS_PASSWORD=strands_redis_pass
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass strands_redis_pass
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # PostgreSQL with pgvector for vector storage
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: strands-postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    environment:
+      - POSTGRES_DB=strands_db
+      - POSTGRES_USER=strands_user
+      - POSTGRES_PASSWORD=strands_db_pass
+      - POSTGRES_HOST_AUTH_METHOD=md5
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U strands_user -d strands_db"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Strands Agent Swarm Team
+  agent-team:
+    build: .
+    container_name: strands-agent-team
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=strands_db
+      - POSTGRES_USER=strands_user
+      - POSTGRES_PASSWORD=strands_db_pass
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=strands_redis_pass
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    command: >
+      sh -c "
+        echo 'Starting Strands Agent Swarm Team with Groq API...' &&
+        python main.py
+      "
+
+volumes:
+  redis_data:
+    driver: local
+  postgres_data:
+    driver: local
